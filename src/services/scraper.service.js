@@ -77,6 +77,17 @@ function parseAnimeCard($, el) {
   };
 }
 
+/**
+ * Ekstrak nomor page dari URL paginasi.
+ * https://anichin.cafe/page/3/ → 3
+ * https://anichin.cafe/ → 1
+ */
+function extractPageNumber(url) {
+  if (!url) return null;
+  const match = url.match(/\/page\/(\d+)\//);
+  return match ? Number(match[1]) : 1;
+}
+
 function parsePagination($) {
   const pages = [];
   $('.pagination .page-numbers').each((_, el) => {
@@ -92,43 +103,61 @@ function parsePagination($) {
 
 // ─── Home ─────────────────────────────────────────────────────────────────────
 
-async function getHome() {
-  const cacheKey = 'home';
+async function getHome(page = 1) {
+  const cacheKey = `home:${page}`;
   const cached   = await cache.get(cacheKey);
   if (cached) return cached;
 
   return withLock(cacheKey, async () => {
-    // Double-check cache setelah dapat lock
     const hit = await cache.get(cacheKey);
     if (hit) return hit;
 
-    const $ = await fetchHtml(BASE_URL);
+    const url = page > 1 ? `${BASE_URL}/page/${page}/` : BASE_URL;
+    const $   = await fetchHtml(url);
 
+    // Slider hanya di page 1
     const slider = [];
-    $('#slidertwo .swiper-slide:not(.swiper-slide-duplicate)').each((_, el) => {
-      const $el    = $(el);
-      const linkEl = $el.find('.info h2 a');
-      const href   = linkEl.attr('href') || '';
-      slider.push({
-        title:       linkEl.text().trim(),
-        slug:        extractSlug(href),
-        backdrop:    ($el.find('.backdrop').attr('style') || '').replace(/background-image:\s*url\(['"]?|['"]?\)/g, '').trim(),
-        description: $el.find('.info p').text().trim(),
+    if (Number(page) === 1) {
+      $('#slidertwo .swiper-slide:not(.swiper-slide-duplicate)').each((_, el) => {
+        const $el    = $(el);
+        const linkEl = $el.find('.info h2 a');
+        const href   = linkEl.attr('href') || '';
+        slider.push({
+          title:       linkEl.text().trim(),
+          slug:        extractSlug(href),
+          backdrop:    ($el.find('.backdrop').attr('style') || '').replace(/background-image:\s*url\(['"]?|['"]?\)/g, '').trim(),
+          description: $el.find('.info p').text().trim(),
+        });
       });
-    });
+    }
 
     const popularToday = [];
-    $('.bixbox.bbnofrm:first-of-type .listupd .bs').each((_, el) => {
-      popularToday.push(parseAnimeCard($, el));
-    });
+    if (Number(page) === 1) {
+      $('.bixbox.bbnofrm:first-of-type .listupd .bs').each((_, el) => {
+        popularToday.push(parseAnimeCard($, el));
+      });
+    }
 
     const latestRelease = [];
     $('.releases.latesthome').closest('.bixbox').find('.bs').each((_, el) => {
       latestRelease.push(parseAnimeCard($, el));
     });
 
-    const nextPage = $('.hpage a.r').attr('href') || null;
-    const result   = { slider, popularToday, latestRelease, nextPage };
+    const nextPage = $('.hpage a.r').attr('href')
+      ? extractPageNumber($('.hpage a.r').attr('href'))
+      : null;
+    const prevPage = $('.hpage a.l').attr('href')
+      ? extractPageNumber($('.hpage a.l').attr('href'))
+      : null;
+
+    const result = {
+      page: Number(page),
+      slider,
+      popularToday,
+      latestRelease,
+      prevPage,
+      nextPage,
+    };
 
     await cache.set(cacheKey, result, cache.TTL.home);
     return result;
@@ -435,7 +464,7 @@ async function getSearch(query, page = 1) {
  */
 async function refreshCache(type, slug) {
   switch (type) {
-    case 'home':      await cache.del('home'); break;
+    case 'home':      await cache.delPattern('home:*'); break;
     case 'ongoing':   await cache.delPattern('ongoing:*'); break;
     case 'completed': await cache.delPattern('completed:*'); break;
     case 'schedule':  await cache.del('schedule'); break;
@@ -444,7 +473,7 @@ async function refreshCache(type, slug) {
     case 'search':    await cache.delPattern('search:*'); break;
     case 'all':
       await Promise.all([
-        cache.del('home'),
+        cache.delPattern('home:*'),
         cache.del('schedule'),
         cache.delPattern('ongoing:*'),
         cache.delPattern('completed:*'),

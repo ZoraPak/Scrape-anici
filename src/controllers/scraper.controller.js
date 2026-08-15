@@ -2,7 +2,7 @@ const service = require('../services/scraper.service');
 
 async function home(req, res, next) {
   try {
-    const data = await service.getHome();
+    const data = await service.getHome(req.query.page || 1);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
@@ -54,8 +54,8 @@ async function search(req, res, next) {
 }
 
 
- * Body: { type: 'home'|'ongoing'|'completed'|'schedule'|'detail'|'stream'|'all', slug?: string }
- */
+// POST /internal/refresh
+// Body: { type: 'home'|'ongoing'|'completed'|'schedule'|'detail'|'stream'|'all', slug?: string }
 async function refresh(req, res, next) {
   try {
     const { type, slug } = req.body;
