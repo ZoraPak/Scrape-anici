@@ -1,12 +1,33 @@
-const express      = require('express');
+const express       = require('express');
+const cors          = require('cors');
 const scraperRoutes = require('./routes/scraper.routes');
-const { general }  = require('./middlewares/rateLimiter');
-const errorHandler = require('./middlewares/errorHandler');
+const { general }   = require('./middlewares/rateLimiter');
+const errorHandler  = require('./middlewares/errorHandler');
 
 const app = express();
 
-// Trust proxy (wajib kalau di belakang Nginx/Cloudflare agar req.ip benar)
+// Trust proxy
 app.set('trust proxy', 1);
+
+// CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://animesaga.online',
+  'https://www.animesaga.online',
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Izinkan request tanpa origin (Postman, server-to-server, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} tidak diizinkan`));
+  },
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'X-Internal-Secret'],
+  credentials: true,
+}));
 
 // Parse JSON body
 app.use(express.json());
