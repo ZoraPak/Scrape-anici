@@ -1,7 +1,7 @@
 const { Router }    = require('express');
 const controller    = require('../controllers/scraper.controller');
 const { validateSeriesSlug, validateEpisodeSlug } = require('../middlewares/validateUrl');
-const { strict }    = require('../middlewares/rateLimiter');
+const { strict, search } = require('../middlewares/rateLimiter');
 const internalOnly  = require('../middlewares/internalOnly');
 
 const router = Router();
@@ -19,6 +19,10 @@ router.get('/completed', controller.completed);
 
 // GET /api/schedule
 router.get('/schedule', controller.schedule);
+
+// GET /api/search?q=soul+land&page=1
+// search limiter karena query ke sumber lebih mahal
+router.get('/search', search, controller.search);
 
 // GET /api/detail?slug=stellar-transformation-season-5
 // strict limiter karena scraping berat

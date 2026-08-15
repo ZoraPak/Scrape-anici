@@ -26,6 +26,7 @@ app.get('/', (req, res) => {
       schedule:       'GET  /api/schedule',
       detail_series:  'GET  /api/detail?slug=stellar-transformation-season-5',
       stream_episode: 'GET  /api/stream?slug=soul-land-2-episode-12',
+      search:         'GET  /api/search?q=soul+land&page=1',
       refresh_cache:  'POST /api/internal/refresh  [internal only]',
     },
   });

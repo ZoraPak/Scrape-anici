@@ -42,8 +42,18 @@ async function stream(req, res, next) {
   } catch (err) { next(err); }
 }
 
-/**
- * POST /internal/refresh
+async function search(req, res, next) {
+  try {
+    const { q, page } = req.query;
+    if (!q || !q.trim()) {
+      return res.status(400).json({ success: false, message: 'Query parameter "q" wajib diisi.' });
+    }
+    const data = await service.getSearch(q.trim(), page || 1);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+
  * Body: { type: 'home'|'ongoing'|'completed'|'schedule'|'detail'|'stream'|'all', slug?: string }
  */
 async function refresh(req, res, next) {
@@ -57,4 +67,4 @@ async function refresh(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { home, ongoing, completed, schedule, detail, stream, refresh };
+module.exports = { home, ongoing, completed, schedule, detail, stream, search, refresh };

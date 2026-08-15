@@ -385,6 +385,45 @@ async function getStream(url) {
   }, () => cache.get(cacheKey));
 }
 
+// ─── Search ──────────────────────────────────────────────────────────────────
+
+async function getSearch(query, page = 1) {
+  const cacheKey = `search:${query.toLowerCase()}:${page}`;
+  const cached   = await cache.get(cacheKey);
+  if (cached) return cached;
+
+  return withLock(cacheKey, async () => {
+    const hit = await cache.get(cacheKey);
+    if (hit) return hit;
+
+    const url = page > 1
+      ? `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}`
+      : `${BASE_URL}/?s=${encodeURIComponent(query)}`;
+
+    const $ = await fetchHtml(url);
+
+    const list = [];
+    $('.listupd .bs').each((_, el) => {
+      list.push(parseAnimeCard($, el));
+    });
+
+    // Cek apakah ada hasil
+    const total = $('.releases h1 span').text().replace(/[^0-9]/g, '') || null;
+
+    const result = {
+      query,
+      page:       Number(page),
+      total:      total ? Number(total) : list.length,
+      list,
+      pagination: parsePagination($),
+    };
+
+    // Cache search lebih singkat — 3 menit
+    await cache.set(cacheKey, result, 3 * 60);
+    return result;
+  }, () => cache.get(cacheKey));
+}
+
 // ─── Refresh (internal) ──────────────────────────────────────────────────────
 
 /**
@@ -402,6 +441,7 @@ async function refreshCache(type, slug) {
     case 'schedule':  await cache.del('schedule'); break;
     case 'detail':    await cache.del(`detail:${slug}`); break;
     case 'stream':    await cache.del(`stream:${slug}`); break;
+    case 'search':    await cache.delPattern('search:*'); break;
     case 'all':
       await Promise.all([
         cache.del('home'),
@@ -410,6 +450,7 @@ async function refreshCache(type, slug) {
         cache.delPattern('completed:*'),
         cache.delPattern('detail:*'),
         cache.delPattern('stream:*'),
+        cache.delPattern('search:*'),
       ]);
       break;
     default:
@@ -419,5 +460,5 @@ async function refreshCache(type, slug) {
 
 module.exports = {
   getHome, getOngoing, getCompleted, getSchedule,
-  getDetailSeries, getStream, refreshCache,
+  getDetailSeries, getStream, getSearch, refreshCache,
 };
